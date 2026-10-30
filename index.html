@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PlateCount</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef1f4;--card:#fff;--ink:#14213d;--mute:#5d6b82;--line:#d9dfe7;--plate:#2f6bff;--warn:#e8a200;--over:#d62839;--ok:#1f9d63}
+@media (prefers-color-scheme:dark){:root{--bg:#10151f;--card:#1a2230;--ink:#eaf0fa;--mute:#93a1b8;--line:#2b3548;--plate:#6c97ff}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 Barlow,system-ui,sans-serif}
+.wrap{max-width:520px;margin:0 auto;padding:16px 16px 60px}
+h1,h2,.big{font-family:"Barlow Condensed",Impact,sans-serif;margin:0;letter-spacing:.2px}
+h1{font-size:30px}h2{font-size:22px;margin-bottom:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:14px}
+label{display:block;font-size:13px;color:var(--mute);margin:10px 0 4px}
+input,select,textarea,button{font:inherit;color:inherit}
+input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+textarea{resize:vertical;min-height:64px}
+button{border:0;border-radius:10px;padding:11px 16px;background:var(--plate);color:#fff;font-weight:600;cursor:pointer}
+button.ghost{background:transparent;color:var(--plate);border:1px solid var(--line)}
+button.sm{padding:6px 10px;font-size:14px}
+button:disabled{opacity:.5}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--plate);outline-offset:2px}
+.row{display:flex;gap:10px}.row>*{flex:1}
+.top{display:flex;justify-content:space-between;align-items:center}
+.big{font-size:56px;line-height:1;font-weight:700}
+.bar{height:14px;background:var(--bg);border-radius:8px;overflow:hidden;margin:10px 0}
+.bar i{display:block;height:100%;background:var(--ok);width:0;transition:width .3s}
+.alert{padding:10px 12px;border-radius:10px;font-weight:500;margin-top:8px}
+.a-info{background:rgba(47,107,255,.12)}.a-warn{background:rgba(232,162,0,.18)}.a-over{background:rgba(214,40,57,.16)}.a-ok{background:rgba(31,157,99,.15)}
+.macros{display:flex;gap:16px;color:var(--mute);font-size:14px}
+.item{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.item:first-child{border-top:0}
+.item small{color:var(--mute);display:block}
+.cal{font-family:"Barlow Condensed",sans-serif;font-size:22px;font-weight:600;white-space:nowrap}
+.hint{font-size:13px;color:var(--mute);margin-top:6px}
+#preview{max-width:100%;max-height:200px;border-radius:10px;margin-top:10px;display:none}
+.days div{display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line)}
+.days div:first-child{border-top:0}
+.hide{display:none}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;opacity:0;pointer-events:none;transition:opacity .25s;max-width:90%;z-index:9}
+#toast.on{opacity:1}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- LOGIN -->
+<section id="auth" class="hide">
+  <h1 style="margin-top:30px">PlateCount</h1>
+  <p class="hint">Snap your meal, get the calories, stay inside your gym numbers.</p>
+  <div class="card">
+    <label for="u">Username</label><input id="u" autocomplete="username" autocapitalize="none">
+    <label for="p">Password</label><input id="p" type="password" autocomplete="current-password">
+    <div class="row" style="margin-top:14px">
+      <button id="btnLogin">Log in</button>
+      <button id="btnSignup" class="ghost">Create account</button>
+    </div>
+    <div id="authMsg" class="hint"></div>
+    <div class="hint">Your meals and weight are saved on the server, so you can log in from any device.</div>
+  </div>
+</section>
+
+<!-- APP -->
+<section id="app" class="hide">
+  <div class="top"><h1>PlateCount</h1><div><span id="who" class="hint"></span> <button class="ghost sm" id="btnOut">Log out</button></div></div>
+
+  <div class="card">
+    <div class="hint">Eaten today</div>
+    <div class="big"><span id="eaten">0</span> <span style="font-size:22px;color:var(--mute)">/ <span id="target">–</span> kcal</span></div>
+    <div class="bar"><i id="fill"></i></div>
+    <div class="macros"><span>Protein <b id="mP">0</b>g</span><span>Carbs <b id="mC">0</b>g</span><span>Fat <b id="mF">0</b>g</span></div>
+    <div id="alerts"></div>
+  </div>
+
+  <div class="card">
+    <h2>Add food</h2>
+    <label for="photo">Photo of your meal (optional)</label>
+    <input id="photo" type="file" accept="image/*" capture="environment">
+    <img id="preview" alt="Meal preview">
+    <label for="desc">Describe it (helps accuracy)</label>
+    <textarea id="desc" placeholder="e.g. 2 rotis, chicken karahi, small bowl of raita"></textarea>
+    <div class="row" style="margin-top:12px">
+      <button id="btnAnalyze">Get calories</button>
+    </div>
+    <div id="result" class="hide">
+      <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
+        <label for="rName">Food</label><input id="rName">
+        <div class="row">
+          <div><label for="rCal">kcal</label><input id="rCal" type="number" min="0"></div>
+          <div><label for="rP">Protein g</label><input id="rP" type="number" min="0"></div>
+          <div><label for="rC">Carbs g</label><input id="rC" type="number" min="0"></div>
+          <div><label for="rF">Fat g</label><input id="rF" type="number" min="0"></div>
+        </div>
+        <div id="rNote" class="hint"></div>
+        <div class="row" style="margin-top:12px"><button id="btnSave">Add to today</button><button class="ghost" id="btnCancel">Discard</button></div>
+      </div>
+    </div>
+    <div class="hint">Photo estimates are rough. Fix the numbers above if they look off.</div>
+    <button class="ghost sm" id="btnManual" style="margin-top:8px">Enter calories by hand</button>
+  </div>
+
+  <div class="card"><h2>Today's food</h2><div id="list"></div></div>
+
+  <div class="card"><h2>Last 7 days</h2><div id="days" class="days"></div></div>
+
+  <div class="card">
+    <h2>My body and daily limit</h2>
+    <div class="row">
+      <div><label for="pW">Weight (kg)</label><input id="pW" type="number" step="0.1" min="20"></div>
+      <div><label for="pH">Height (cm)</label><input id="pH" type="number" min="100"></div>
+      <div><label for="pA">Age</label><input id="pA" type="number" min="12"></div>
+    </div>
+    <div class="row">
+      <div><label for="pS">Sex</label><select id="pS"><option value="m">Male</option><option value="f">Female</option></select></div>
+      <div><label for="pAct">Activity</label><select id="pAct">
+        <option value="1.2">Desk job, no gym</option><option value="1.375">Gym 1-3 days</option><option value="1.55" selected>Gym 4-5 days</option><option value="1.725">Gym 6-7 days, hard</option></select></div>
+    </div>
+    <label for="pG">Goal</label>
+    <select id="pG"><option value="cut">Lose fat</option><option value="keep">Maintain</option><option value="bulk">Build muscle</option></select>
+    <div class="row" style="margin-top:12px"><button id="btnCalc">Calculate my daily limit</button></div>
+    <div id="calcOut" class="hint"></div>
+    <div class="hint">After your weight changes, update it and calculate again.</div>
+  </div>
+
+</section>
+</div>
+<div id="toast" role="status"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const today=()=>new Date().toLocaleDateString('en-CA');
+let token=localStorage.getItem('pc_token'),P={},log=[],hist={},imgData=null;
+
+function toast(t){const e=$('toast');e.textContent=t;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),3200)}
+async function api(path,method='GET',body){
+  const r=await fetch('/api'+path,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:body?JSON.stringify(body):undefined});
+  let j={};try{j=await r.json()}catch(e){}
+  if(r.status===401&&token&&!path.match(/login|register/)){logout(true)}
+  if(!r.ok)throw new Error(j.error||('Error '+r.status));
+  return j;
+}
+
+/* ---------- login ---------- */
+async function auth(kind){
+  try{const j=await api('/'+kind,'POST',{username:$('u').value,password:$('p').value});
+    token=j.token;localStorage.setItem('pc_token',token);$('p').value='';await boot()}
+  catch(e){$('authMsg').textContent=e.message}
+}
+function logout(silent){
+  if(token&&!silent)api('/logout','POST').catch(()=>{});
+  token=null;localStorage.removeItem('pc_token');showAuth();
+}
+function showAuth(){$('auth').classList.remove('hide');$('app').classList.add('hide')}
+async function boot(){
+  if(!token){showAuth();return}
+  try{
+    const m=await api('/me');P=m.profile;$('who').textContent=m.username;
+    $('pW').value=P.weight||'';$('pH').value=P.height||'';$('pA').value=P.age||'';
+    if(P.sex)$('pS').value=P.sex;if(P.act)$('pAct').value=P.act;if(P.goal)$('pG').value=P.goal;
+    if(P.target)$('calcOut').textContent=`Limit ${P.target} kcal/day, protein goal ${P.protein} g.`;
+    $('auth').classList.add('hide');$('app').classList.remove('hide');
+    await refresh();
+  }catch(e){showAuth()}
+}
+
+/* ---------- profile and target ---------- */
+async function calc(){
+  try{
+    const j=await api('/target','POST',{weight:$('pW').value,height:$('pH').value,age:$('pA').value,sex:$('pS').value,act:$('pAct').value,goal:$('pG').value});
+    P=j.profile;
+    $('calcOut').textContent=`Your limit: ${P.target} kcal/day, protein goal ${P.protein} g (maintenance is about ${j.maintenance}).`;
+    render();toast('Daily limit set');
+  }catch(e){toast(e.message)}
+}
+
+/* ---------- log + alerts ---------- */
+async function refresh(){
+  const [f,h]=await Promise.all([api('/food?day='+today()),api('/history')]);
+  log=f.items;hist=h;render();
+}
+const sum=()=>log.reduce((a,e)=>({c:a.c+e.cal,p:a.p+e.p,cb:a.cb+e.c,f:a.f+e.f}),{c:0,p:0,cb:0,f:0});
+function render(){
+  const t=sum();
+  $('eaten').textContent=Math.round(t.c);$('target').textContent=P.target||'–';
+  $('mP').textContent=Math.round(t.p);$('mC').textContent=Math.round(t.cb);$('mF').textContent=Math.round(t.f);
+  const pct=P.target?t.c/P.target:0,f=$('fill');
+  f.style.width=Math.min(100,pct*100)+'%';
+  f.style.background=pct>1?'var(--over)':pct>.8?'var(--warn)':'var(--ok)';
+  let a='';
+  if(!P.target)a='<div class="alert a-info">Set your daily limit below to turn on alerts.</div>';
+  else if(pct>1)a=`<div class="alert a-over">Over your limit by ${Math.round(t.c-P.target)} kcal. Stop eating for today or keep it light.</div>`;
+  else if(pct>=.8)a=`<div class="alert a-warn">Almost there: ${Math.round(P.target-t.c)} kcal left today.</div>`;
+  else if(log.length)a=`<div class="alert a-ok">${Math.round(P.target-t.c)} kcal left today.</div>`;
+  if(P.protein&&log.length&&pct>=.7&&t.p<P.protein*.7)a+=`<div class="alert a-info">Protein is low: ${Math.round(t.p)} of ${P.protein} g. Pick a high-protein option next.</div>`;
+  $('alerts').innerHTML=a;
+  $('list').innerHTML=log.length?log.map(e=>`<div class="item"><div>${esc(e.name)}<small>P ${Math.round(e.p)} / C ${Math.round(e.c)} / F ${Math.round(e.f)} g</small></div><div style="text-align:right"><div class="cal">${Math.round(e.cal)}</div><button class="ghost sm" data-del="${e.id}" aria-label="Delete ${esc(e.name)}">Delete</button></div></div>`).join(''):'<div class="hint">Nothing logged yet. Add your first meal above.</div>';
+  let h='';
+  for(let i=0;i<7;i++){const d=new Date();d.setDate(d.getDate()-i);const k=d.toLocaleDateString('en-CA');
+    h+=`<div><span>${i?d.toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'}):'Today'}</span><b>${Math.round(hist[k]||0)} kcal</b></div>`}
+  $('days').innerHTML=h;
+}
+$('list').addEventListener('click',async e=>{
+  const id=e.target.dataset.del;if(!id)return;
+  try{await api('/food/'+id,'DELETE');await refresh()}catch(err){toast(err.message)}
+});
+
+/* ---------- add food ---------- */
+function showResult(r){
+  $('result').classList.remove('hide');
+  $('rName').value=r.name||'';$('rCal').value=Math.round(r.cal||0);$('rP').value=Math.round(r.p||0);$('rC').value=Math.round(r.c||0);$('rF').value=Math.round(r.f||0);
+  $('rNote').textContent=r.note||'';
+}
+function resetAdd(){imgData=null;$('result').classList.add('hide');$('desc').value='';$('photo').value='';$('preview').style.display='none'}
+async function saveEntry(){
+  const before=P.target?sum().c/P.target:0;
+  try{
+    await api('/food','POST',{day:today(),name:$('rName').value,cal:$('rCal').value||0,p:$('rP').value||0,c:$('rC').value||0,f:$('rF').value||0});
+    resetAdd();await refresh();
+    if(P.target){const after=sum().c/P.target;
+      if(after>1&&before<=1)toast('Alert: you just went over your daily limit');
+      else if(after>=.8&&before<.8)toast('Alert: you have used 80% of your daily limit')}
+  }catch(e){toast(e.message)}
+}
+$('photo').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;
+  const img=new Image();img.onload=()=>{
+    const s=Math.min(1,768/Math.max(img.width,img.height)),c=document.createElement('canvas');
+    c.width=img.width*s;c.height=img.height*s;c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    const url=c.toDataURL('image/jpeg',.7);imgData=url.split(',')[1];
+    $('preview').src=url;$('preview').style.display='block';URL.revokeObjectURL(img.src)};
+  img.src=URL.createObjectURL(f);
+});
+async function analyze(){
+  const desc=$('desc').value.trim();
+  if(!imgData&&!desc){toast('Add a photo or a description');return}
+  $('btnAnalyze').disabled=true;$('btnAnalyze').textContent='Analyzing...';
+  try{showResult(await api('/analyze','POST',{desc,image:imgData,day:today()}))}
+  catch(e){toast(e.message)}
+  $('btnAnalyze').disabled=false;$('btnAnalyze').textContent='Get calories';
+}
+
+/* ---------- wire up ---------- */
+$('btnLogin').onclick=()=>auth('login');$('btnSignup').onclick=()=>auth('register');$('btnOut').onclick=()=>logout();
+$('btnCalc').onclick=calc;$('btnAnalyze').onclick=analyze;$('btnSave').onclick=saveEntry;$('btnCancel').onclick=resetAdd;
+$('btnManual').onclick=()=>showResult({name:$('desc').value.trim(),cal:0,p:0,c:0,f:0,note:'Type the numbers yourself.'});
+$('p').addEventListener('keydown',e=>{if(e.key==='Enter')auth('login')});
+boot();
+</script>
+</body>
+</html>
